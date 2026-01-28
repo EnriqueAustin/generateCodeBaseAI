@@ -22,16 +22,24 @@ import path from "path";
 const OUTPUT_FILE = "codeBase.txt";
 const ROOT = process.cwd();
 
+// ADD EXTRA ROOTS HERE (relative to where you run the script)
+const EXTRA_PATHS = ["../docker"];
+
 /**
  * Get git-tracked files (respects .gitignore)
  */
-function getGitFiles()
+function getGitFiles(baseDir)
 {
-  const output = execSync("git ls-files", { encoding: "utf8" });
+  const output = execSync("git ls-files", {
+    cwd: baseDir,
+    encoding: "utf8",
+  });
+
   return output
     .split("\n")
     .filter(Boolean)
-    .filter(file => !file.endsWith(".txt"));
+    .filter(file => !file.endsWith(".txt"))
+    .map(file => path.join(baseDir, file));
 }
 
 /**
@@ -42,7 +50,26 @@ function langFromExt(ext)
   return ext.replace(".", "") || "";
 }
 
-const files = getGitFiles().sort();
+let allFiles = [];
+
+// main project
+allFiles.push(...getGitFiles(ROOT));
+
+// extra folders (e.g. docker/)
+for (const extra of EXTRA_PATHS)
+{
+  const extraRoot = path.resolve(ROOT, extra);
+  if (fs.existsSync(extraRoot))
+  {
+    allFiles.push(...getGitFiles(extraRoot));
+  }
+}
+
+// normalize, dedupe, sort
+const files = [...new Set(allFiles)]
+  .map(file => path.relative(ROOT, file))
+  .sort();
+  
 let snapshot = "";
 
 // Header
